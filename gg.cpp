@@ -5270,6 +5270,15 @@ bool gg::ggLoadObj(const char *name, GLuint &ng, GLuint (*&group)[2],
   GLfloat (*&amb)[4], GLfloat (*&diff)[4], GLfloat (*&spec)[4], GLfloat *&shi,
   GLuint &nv, GLfloat (*&pos)[3], GLfloat (*&norm)[3], bool normalize)
 {
+  // 引数に初期値を設定する
+  ng = 0;
+  group = 0;
+  amb = diff = spec = 0;
+  shi = 0;
+  nv = 0;
+  pos = 0;
+  norm = 0;
+
   // ファイルパスからディレクトリ名を取り出す
   std::string path(name);
   size_t base = path.find_last_of("/\\");
@@ -5516,10 +5525,6 @@ bool gg::ggLoadObj(const char *name, GLuint &ng, GLuint (*&group)[2],
   ng = static_cast<GLuint>(_group.size());
 
   // メモリの確保
-  group = 0;
-  amb = diff = spec = 0;
-  shi = 0;
-  pos = norm = 0;
   try
   {
     group = new GLuint[ng][2];
@@ -5538,10 +5543,15 @@ bool gg::ggLoadObj(const char *name, GLuint &ng, GLuint (*&group)[2],
     delete[] spec;
     delete[] shi;
     delete[] pos;
+
+    ng = 0;
     group = 0;
     amb = diff = spec = 0;
     shi = 0;
+    nv = 0;
     pos = 0;
+    norm = 0;
+
     return false;
   }
 
