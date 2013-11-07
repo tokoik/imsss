@@ -7,8 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		7D2D597517A8E59900604955 /* budda.obj in Resources */ = {isa = PBXBuildFile; fileRef = 7D2D597417A8E57100604955 /* budda.obj */; };
-		7D2D597617A8E59D00604955 /* budda.mtl in Resources */ = {isa = PBXBuildFile; fileRef = 7D2D597317A8E57100604955 /* budda.mtl */; };
 		7D51BEA917958ACB00C7D4AC /* GgPointShader.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7D51BEA517958ACB00C7D4AC /* GgPointShader.cpp */; };
 		7D51BEAA17958ACB00C7D4AC /* GgObjShader.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7D51BEA717958ACB00C7D4AC /* GgObjShader.cpp */; };
 		7D58D9FB179D373C007FFC4E /* reflection0.tga in Resources */ = {isa = PBXBuildFile; fileRef = 7D58D9F3179D3727007FFC4E /* reflection0.tga */; };
@@ -20,15 +18,12 @@
 		7D58DA01179D374A007FFC4E /* reflection7.tga in Resources */ = {isa = PBXBuildFile; fileRef = 7D58D9F9179D3733007FFC4E /* reflection7.tga */; };
 		7D58DA02179D374C007FFC4E /* reflection8.tga in Resources */ = {isa = PBXBuildFile; fileRef = 7D58D9FA179D3733007FFC4E /* reflection8.tga */; };
 		7D79E2B5179A697100E3BB1C /* GgObj.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7D79E2B3179A697100E3BB1C /* GgObj.cpp */; };
-		7D7AA77517995F7400A82CAB /* HondaS2000.mtl in Resources */ = {isa = PBXBuildFile; fileRef = 7D7AA77317995F6C00A82CAB /* HondaS2000.mtl */; };
-		7D7AA77617995F7700A82CAB /* HondaS2000.obj in Resources */ = {isa = PBXBuildFile; fileRef = 7D7AA77417995F6C00A82CAB /* HondaS2000.obj */; };
 		7D7AF85F1222C8CC003A0434 /* opengl.icns in Resources */ = {isa = PBXBuildFile; fileRef = 7D7AF85E1222C8CC003A0434 /* opengl.icns */; };
 		7D802230179BDEFD00F504B3 /* reflection4.tga in Resources */ = {isa = PBXBuildFile; fileRef = 7D80222E179BDEF200F504B3 /* reflection4.tga */; };
 		7D802231179BDF0200F504B3 /* ball.mtl in Resources */ = {isa = PBXBuildFile; fileRef = 7D80222B179BDECF00F504B3 /* ball.mtl */; };
 		7D802232179BDF0500F504B3 /* ball.obj in Resources */ = {isa = PBXBuildFile; fileRef = 7D80222C179BDECF00F504B3 /* ball.obj */; };
 		7D82196A17958741005EBE5F /* gg.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7D82196817958741005EBE5F /* gg.cpp */; };
 		7D82196C17958746005EBE5F /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7D82196B17958746005EBE5F /* main.cpp */; };
-		7D82197A1795876F005EBE5F /* dragon.obj in Resources */ = {isa = PBXBuildFile; fileRef = 7D8219791795876F005EBE5F /* dragon.obj */; };
 		7D82197B1795877D005EBE5F /* pass1.frag in Resources */ = {isa = PBXBuildFile; fileRef = 7D82197417958753005EBE5F /* pass1.frag */; };
 		7D82197C1795877D005EBE5F /* pass1.vert in Resources */ = {isa = PBXBuildFile; fileRef = 7D82197517958753005EBE5F /* pass1.vert */; };
 		7D82197D1795877D005EBE5F /* pass2.frag in Resources */ = {isa = PBXBuildFile; fileRef = 7D82197617958753005EBE5F /* pass2.frag */; };
@@ -37,17 +32,12 @@
 		7D85C898179D69F8007FFDB0 /* reflection9.tga in Resources */ = {isa = PBXBuildFile; fileRef = 7D85C897179D69F0007FFDB0 /* reflection9.tga */; };
 		7DAB4012179C27AB00D6B66D /* box.obj in Resources */ = {isa = PBXBuildFile; fileRef = 7DAB4011179C279700D6B66D /* box.obj */; };
 		7DAB4013179C27AD00D6B66D /* box.mtl in Resources */ = {isa = PBXBuildFile; fileRef = 7DAB4010179C279700D6B66D /* box.mtl */; };
-		7DDD8BBA179D8FDD00262962 /* AC 1038.obj in Resources */ = {isa = PBXBuildFile; fileRef = 7DDD8BB9179D8FD200262962 /* AC 1038.obj */; };
-		7DDD8BBB179D8FDF00262962 /* AC 1038.mtl in Resources */ = {isa = PBXBuildFile; fileRef = 7DDD8BB8179D8FD200262962 /* AC 1038.mtl */; };
 		7DECEC83179BF4B9003D8DED /* bunny.mtl in Resources */ = {isa = PBXBuildFile; fileRef = 7D802233179BF06300F504B3 /* bunny.mtl */; };
-		7DECEC84179BF4BE003D8DED /* dragon.mtl in Resources */ = {isa = PBXBuildFile; fileRef = 7DECEC82179BF4AD003D8DED /* dragon.mtl */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		7D1E90EE1123E36C005E6C75 /* imsss.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = imsss.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7D1E90F11123E36C005E6C75 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		7D2D597317A8E57100604955 /* budda.mtl */ = {isa = PBXFileReference; lastKnownFileType = text; path = budda.mtl; sourceTree = "<group>"; };
-		7D2D597417A8E57100604955 /* budda.obj */ = {isa = PBXFileReference; lastKnownFileType = text; path = budda.obj; sourceTree = "<group>"; };
 		7D51BEA517958ACB00C7D4AC /* GgPointShader.cpp */ = {isa = PBXFileReference; fileEncoding = 8; lastKnownFileType = sourcecode.cpp.cpp; path = GgPointShader.cpp; sourceTree = "<group>"; };
 		7D51BEA617958ACB00C7D4AC /* GgPointShader.h */ = {isa = PBXFileReference; fileEncoding = 8; lastKnownFileType = sourcecode.c.h; path = GgPointShader.h; sourceTree = "<group>"; };
 		7D51BEA717958ACB00C7D4AC /* GgObjShader.cpp */ = {isa = PBXFileReference; fileEncoding = 8; lastKnownFileType = sourcecode.cpp.cpp; path = GgObjShader.cpp; sourceTree = "<group>"; };
@@ -62,8 +52,6 @@
 		7D58D9FA179D3733007FFC4E /* reflection8.tga */ = {isa = PBXFileReference; lastKnownFileType = file; path = reflection8.tga; sourceTree = "<group>"; };
 		7D79E2B3179A697100E3BB1C /* GgObj.cpp */ = {isa = PBXFileReference; fileEncoding = 8; lastKnownFileType = sourcecode.cpp.cpp; path = GgObj.cpp; sourceTree = "<group>"; };
 		7D79E2B4179A697100E3BB1C /* GgObj.h */ = {isa = PBXFileReference; fileEncoding = 8; lastKnownFileType = sourcecode.c.h; path = GgObj.h; sourceTree = "<group>"; };
-		7D7AA77317995F6C00A82CAB /* HondaS2000.mtl */ = {isa = PBXFileReference; lastKnownFileType = text; path = HondaS2000.mtl; sourceTree = "<group>"; };
-		7D7AA77417995F6C00A82CAB /* HondaS2000.obj */ = {isa = PBXFileReference; lastKnownFileType = text; path = HondaS2000.obj; sourceTree = "<group>"; };
 		7D7AF85E1222C8CC003A0434 /* opengl.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = opengl.icns; sourceTree = "<group>"; };
 		7D80222B179BDECF00F504B3 /* ball.mtl */ = {isa = PBXFileReference; lastKnownFileType = text; path = ball.mtl; sourceTree = "<group>"; };
 		7D80222C179BDECF00F504B3 /* ball.obj */ = {isa = PBXFileReference; lastKnownFileType = text; path = ball.obj; sourceTree = "<group>"; };
@@ -77,13 +65,9 @@
 		7D82197617958753005EBE5F /* pass2.frag */ = {isa = PBXFileReference; fileEncoding = 8; lastKnownFileType = sourcecode.glsl; path = pass2.frag; sourceTree = "<group>"; };
 		7D82197717958753005EBE5F /* pass2.vert */ = {isa = PBXFileReference; fileEncoding = 8; lastKnownFileType = sourcecode.glsl; path = pass2.vert; sourceTree = "<group>"; };
 		7D8219781795876A005EBE5F /* bunny.obj */ = {isa = PBXFileReference; fileEncoding = 8; lastKnownFileType = text; path = bunny.obj; sourceTree = "<group>"; };
-		7D8219791795876F005EBE5F /* dragon.obj */ = {isa = PBXFileReference; fileEncoding = 8; lastKnownFileType = text; path = dragon.obj; sourceTree = "<group>"; };
 		7D85C897179D69F0007FFDB0 /* reflection9.tga */ = {isa = PBXFileReference; lastKnownFileType = file; path = reflection9.tga; sourceTree = "<group>"; };
 		7DAB4010179C279700D6B66D /* box.mtl */ = {isa = PBXFileReference; lastKnownFileType = text; path = box.mtl; sourceTree = "<group>"; };
 		7DAB4011179C279700D6B66D /* box.obj */ = {isa = PBXFileReference; lastKnownFileType = text; path = box.obj; sourceTree = "<group>"; };
-		7DDD8BB8179D8FD200262962 /* AC 1038.mtl */ = {isa = PBXFileReference; lastKnownFileType = text; path = "AC 1038.mtl"; sourceTree = "<group>"; };
-		7DDD8BB9179D8FD200262962 /* AC 1038.obj */ = {isa = PBXFileReference; lastKnownFileType = text; path = "AC 1038.obj"; sourceTree = "<group>"; };
-		7DECEC82179BF4AD003D8DED /* dragon.mtl */ = {isa = PBXFileReference; lastKnownFileType = text; path = dragon.mtl; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -125,14 +109,6 @@
 				7D85C897179D69F0007FFDB0 /* reflection9.tga */,
 				7D8219781795876A005EBE5F /* bunny.obj */,
 				7D802233179BF06300F504B3 /* bunny.mtl */,
-				7D8219791795876F005EBE5F /* dragon.obj */,
-				7DECEC82179BF4AD003D8DED /* dragon.mtl */,
-				7D2D597417A8E57100604955 /* budda.obj */,
-				7D2D597317A8E57100604955 /* budda.mtl */,
-				7D7AA77417995F6C00A82CAB /* HondaS2000.obj */,
-				7D7AA77317995F6C00A82CAB /* HondaS2000.mtl */,
-				7DDD8BB9179D8FD200262962 /* AC 1038.obj */,
-				7DDD8BB8179D8FD200262962 /* AC 1038.mtl */,
 				7D80222C179BDECF00F504B3 /* ball.obj */,
 				7D80222B179BDECF00F504B3 /* ball.mtl */,
 				7DAB4011179C279700D6B66D /* box.obj */,
@@ -220,14 +196,6 @@
 				7D85C898179D69F8007FFDB0 /* reflection9.tga in Resources */,
 				7D82197F1795877D005EBE5F /* bunny.obj in Resources */,
 				7DECEC83179BF4B9003D8DED /* bunny.mtl in Resources */,
-				7D82197A1795876F005EBE5F /* dragon.obj in Resources */,
-				7DECEC84179BF4BE003D8DED /* dragon.mtl in Resources */,
-				7D2D597517A8E59900604955 /* budda.obj in Resources */,
-				7D2D597617A8E59D00604955 /* budda.mtl in Resources */,
-				7D7AA77617995F7700A82CAB /* HondaS2000.obj in Resources */,
-				7D7AA77517995F7400A82CAB /* HondaS2000.mtl in Resources */,
-				7DDD8BBA179D8FDD00262962 /* AC 1038.obj in Resources */,
-				7DDD8BBB179D8FDF00262962 /* AC 1038.mtl in Resources */,
 				7D802232179BDF0500F504B3 /* ball.obj in Resources */,
 				7D802231179BDF0200F504B3 /* ball.mtl in Resources */,
 				7DAB4012179C27AB00D6B66D /* box.obj in Resources */,

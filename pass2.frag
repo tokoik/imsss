@@ -87,7 +87,7 @@ void main(void)
     // 可視係数の総和を求める
     count += visibility;
 
-	//if (visibility == 0.0) continue;  // これを有効にすると 15% くらい遅くなる
+    //if (visibility == 0.0) continue;  // これを有効にすると 15% くらい遅くなる
 
     // 天空マップのサンプリング方向を求める
     vec4 v = mt * point[i];
