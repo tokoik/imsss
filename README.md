@@ -7,7 +7,7 @@ Image Based Screen Space Subsurface Scattering Sample
 
 ## データファイル
 * 形状データには三角形分割した Wavefront OBJ 形式のファイルが使えます．
-  - Blender で Export するときは "Include Nomals," "Write Materials," "Trianglate Faces" にチェックを入れてください．
+  - Blender で Export するときは "Include Normals," "Write Materials," "Triangulate Faces" にチェックを入れてください．
   - 形状データの大きさは読み込み時 [-1,1] に正規化されます．
   - マテリアルも読み込みますが，値の使い方は本来とは違います．
 * テクスチャは縦横 2^n 画素の TGA 形式のファイルです．
