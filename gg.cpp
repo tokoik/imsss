@@ -4640,32 +4640,17 @@ bool gg::ggSaveColor(const char *name)
 
   // ビューポートのサイズ分のメモリを確保する
   size_t size = viewport[2] * viewport[3] * 3;
-  GLubyte *buffer = 0;
-  try
-  {
-    buffer = new GLubyte[size];
-  }
-  catch (std::bad_alloc e)
-  {
-    // メモリ確保に失敗した
-    std::cerr << "Waring: Can't allocate memory to write file: " << name << std::endl;
-    return false;
-  }
+  std::vector<GLubyte> buffer(size);
 
   // 画面表示の完了を待つ
   glFinish();
 
   // カラーバッファを読み込む
   glReadPixels(viewport[0], viewport[1], viewport[2], viewport[3],
-    GL_BGR, GL_UNSIGNED_BYTE, buffer);
+    GL_BGR, GL_UNSIGNED_BYTE, &buffer[0]);
 
   // 読み込んだデータをファイルに書き込む
-  bool ret = ggSaveTga(viewport[2], viewport[3], 3, buffer, name);
-
-  // 読み込みに使ったメモリを解放する
-  delete[] buffer;
-
-  return ret;
+  return ggSaveTga(viewport[2], viewport[3], 3, &buffer[0], name);
 }
 
 /*
@@ -4679,32 +4664,17 @@ bool gg::ggSaveDepth(const char *name)
 
   // ビューポートのサイズ分のメモリを確保する
   size_t size = viewport[2] * viewport[3];
-  GLubyte *buffer = 0;
-  try
-  {
-    buffer = new GLubyte[size];
-  }
-  catch (std::bad_alloc e)
-  {
-    // メモリ確保に失敗した
-    std::cerr << "Waring: Can't allocate memory to write file: " << name << std::endl;
-    return false;
-  }
+  std::vector<GLubyte> buffer(size);
 
   // 画面表示の完了を待つ
   glFinish();
 
   // デプスバッファを読み込む
   glReadPixels(viewport[0], viewport[1], viewport[2], viewport[3],
-    GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, buffer);
+    GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, &buffer[0]);
 
   // 読み込んだデータをファイルに書き込む
-  bool ret = ggSaveTga(viewport[2], viewport[3], 1, buffer, name);
-
-  // 読み込みに使ったメモリを解放する
-  delete[] buffer;
-
-  return ret;
+  return ggSaveTga(viewport[2], viewport[3], 1, &buffer[0], name);
 }
 
 /*
@@ -5753,11 +5723,11 @@ static bool readShaderSource(GLuint shader, const char *name)
     GLsizei length = static_cast<GLsizei>(file.tellg());
 
     // ファイルサイズのメモリを確保
-    char *buffer = new GLchar[length];
+    std::vector<GLchar> buffer(length);
 
     // ファイルを先頭から読み込む
     file.seekg(0L, std::ios::beg);
-    file.read(buffer, length);
+    file.read(&buffer[0], length);
 
     if (file.bad())
     {
@@ -5766,14 +5736,11 @@ static bool readShaderSource(GLuint shader, const char *name)
     }
     else {
       // シェーダのソースプログラムのシェーダオブジェクトへの読み込み
-      const GLchar *source[] = { buffer };
+      const GLchar *source[] = { &buffer[0] };
       glShaderSource(shader, 1, source, &length);
       ret = false;
     }
     file.close();
-
-    // 読み込みに使ったメモリを開放する
-    delete[] buffer;
   }
 
   return ret;
@@ -5796,11 +5763,10 @@ static GLboolean printShaderInfoLog(GLuint shader, const char *str)
   if (bufSize > 1)
   {
     // シェーダのコンパイル時のログの内容を取得する
-    GLchar *infoLog = new GLchar[bufSize];
+    std::vector<GLchar> infoLog(bufSize);
     GLsizei length;
-    glGetShaderInfoLog(shader, bufSize, &length, infoLog);
-    std::cerr << infoLog << std::endl;
-    delete[] infoLog;
+    glGetShaderInfoLog(shader, bufSize, &length, &infoLog[0]);
+    std::cerr << &infoLog[0] << std::endl;
   }
 
   return (GLboolean)status;
@@ -5823,11 +5789,10 @@ static GLboolean printProgramInfoLog(GLuint program)
   if (bufSize > 1)
   {
     // シェーダのリンク時のログの内容を取得する
-    GLchar *infoLog = new GLchar[bufSize];
+    std::vector<GLchar> infoLog(bufSize);
     GLsizei length;
-    glGetProgramInfoLog(program, bufSize, &length, infoLog);
-    std::cerr << infoLog << std::endl;
-    delete[] infoLog;
+    glGetProgramInfoLog(program, bufSize, &length, &infoLog[0]);
+    std::cerr << &infoLog[0] << std::endl;
   }
 
   return (GLboolean)status;
