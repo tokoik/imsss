@@ -1,0 +1,8 @@
+GgObj.o: GgObj.cpp GgObj.h GgObjShader.h GgPointShader.h gg.h glfw.h \
+ glext.h
+GgObjShader.o: GgObjShader.cpp GgObjShader.h GgPointShader.h gg.h glfw.h \
+ glext.h
+GgPointShader.o: GgPointShader.cpp GgPointShader.h gg.h glfw.h glext.h
+gg.o: gg.cpp gg.h glfw.h glext.h
+main.o: main.cpp gg.h glfw.h glext.h GgObj.h GgObjShader.h \
+ GgPointShader.h
