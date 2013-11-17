@@ -35,8 +35,8 @@ using namespace gg;
 // 形状データ
 //static const char objfile[] = "box.obj";
 //static const char objfile[] = "ball.obj";
-//static const char objfile[] = "bunny.obj";
-static const char objfile[] = "dragon2.obj";
+static const char objfile[] = "bunny.obj";
+//static const char objfile[] = "dragon2.obj";
 //static const char objfile[] = "budda.obj";
 //static const char objfile[] = "HondaS2000.obj";
 //static const char objfile[] = "AC 1038.obj";
