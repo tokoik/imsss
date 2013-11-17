@@ -1,5 +1,5 @@
 CXXFLAGS	= -I/usr/X11R6/include -DX11 -Wall
-LDLIBS	= libglfw_linux.a -L/usr/X11R6/lib -lXmu -lXi -lXext -lX11 -lGL -lXrandr -lrt -lpthread -lm -L/usr/local/lib -lopencv_core -lopencv_highgui
+LDLIBS	= libglfw_linux.a -L/usr/X11R6/lib -lX11 -lGL -lXrandr -lrt -lpthread -lm
 OBJECTS	= $(patsubst %.cpp,%.o,$(wildcard *.cpp))
 TARGET	= imsss
 

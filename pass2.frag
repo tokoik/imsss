@@ -15,7 +15,6 @@ uniform int samples;                                                  // ƒTƒ“ƒvƒ
 uniform float radius;                                                 // ƒTƒ“ƒvƒ‹“_‚ÌU•z”¼Œa
 uniform float translucency;                                           // ”¼“§–¾“x
 uniform vec4 ambient;                                                 // ŠÂ‹«Œõ‹­“x
-uniform vec4 mapping;                                                 // ƒeƒNƒXƒ`ƒƒÀ•W‚ÌƒXƒP[ƒ‹‚ÆƒIƒtƒZƒbƒg
 uniform sampler2D unit[6];                                            // ƒeƒNƒXƒ`ƒƒƒ†ƒjƒbƒg
 uniform vec4 point[MAXSAMPLES];                                       // ƒTƒ“ƒvƒ‹“_‚ÌˆÊ’u
 
@@ -32,10 +31,6 @@ layout (location = 0) out vec4 fc;                                    // ƒtƒ‰ƒOƒ
 
 void main(void)
 {
-  // ”½Ëƒ}ƒbƒv‚ÌƒeƒXƒg—p
-  //fc = texture(unit[5], tc * mapping.xy + mapping.zw);
-  //return;
-
   // unit[0] ‚©‚ç albedo ‚ğæ“¾
   vec4 albedo = texture(unit[0], tc);
 
@@ -68,7 +63,7 @@ void main(void)
 #if REFLECTIVE_OCCLUSION
   vec4 specular = vec4(0.0);
 #else
-  vec4 specular = mix(ambient, texture(unit[5], (reflection.xz * 0.5 / (1.0 + reflection.y) + 0.5) * mapping.xy + mapping.zw), step(0.0, reflection.y));
+  vec4 specular = mix(ambient, texture(unit[5], reflection.xz * 0.5 / (1.0 + reflection.y) + 0.5), step(0.0, reflection.y));
 #endif
 
   // Õ•Á‚³‚ê‚È‚¢ƒ|ƒCƒ“ƒg‚Ì”
@@ -98,14 +93,14 @@ void main(void)
     vec4 v = mt * point[i];
 
     // •ú•¨–Êƒ}ƒbƒv‚©‚ç“V‹ó‚Ì•úË‹P“x‚ğ“¾‚é (v.y < 0 ‚È‚ç•ú•¨–Êƒ}ƒbƒv‚ÌŠO‘¤‚¾‚©‚ç”wŒiF)
-    vec4 radiance = mix(ambient, texture(unit[5], (v.xz * 0.5 / (1.0 + v.y) + 0.5) * mapping.xy + mapping.zw), step(0.0, v.y)) * visibility;
+    vec4 radiance = mix(ambient, texture(unit[5], v.xz * 0.5 / (1.0 + v.y) + 0.5), step(0.0, v.y)) * visibility;
   
     // normal •ûŒü‚Ì•úËÆ“x‚Ìd‚İ‚Ã‚¯˜a‚ğ‹‚ß‚é
     diffuse += max(dot(v.xyz, normal), 0.0) * radiance;
 
 #if REFLECTIVE_OCCLUSION
     // reflection •ûŒü‚Ì•úËÆ“x‚Ìd‚İ‚Ã‚¯˜a‚ğ‹‚ß‚é
-    specular += pow(max(dot(v.xyz, reflection), 0.0), kshi) * radiance;
+	specular += pow(max(dot(v.xyz, reflection), 0.0), kshi) * radiance;
 #endif
   }
 
