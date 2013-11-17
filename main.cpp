@@ -5,6 +5,23 @@
 // 時刻の計測に glfwGetTime() も使うなら 1
 #define USE_GLFWGETTIME 0
 
+#include <opencv2/highgui/highgui.hpp>
+
+#ifdef _WIN32
+#  include <Windows.h>
+#  define CV_VERSION_STR CVAUX_STR(CV_MAJOR_VERSION) CVAUX_STR(CV_MINOR_VERSION) CVAUX_STR(CV_SUBMINOR_VERSION)
+#  ifdef _DEBUG
+#    define CV_EXT_STR "d.lib"
+#  else
+#    define CV_EXT_STR ".lib"
+#  endif
+#  pragma comment(lib, "opencv_core" CV_VERSION_STR CV_EXT_STR)
+#  pragma comment(lib, "opencv_highgui" CV_VERSION_STR CV_EXT_STR)
+#else
+#  include <pthread.h>
+#  include <unistd.h>
+#endif
+
 // 補助プログラム
 #include "gg.h"
 using namespace gg;
@@ -18,29 +35,28 @@ using namespace gg;
 // 形状データ
 //static const char objfile[] = "box.obj";
 //static const char objfile[] = "ball.obj";
-static const char objfile[] = "bunny.obj";
-//static const char objfile[] = "dragon2.obj";
+//static const char objfile[] = "bunny.obj";
+static const char objfile[] = "dragon2.obj";
 //static const char objfile[] = "budda.obj";
 //static const char objfile[] = "HondaS2000.obj";
 //static const char objfile[] = "AC 1038.obj";
 
-// テクスチャ
-static const char *texfile[] =
+// キャプチャする画像サイズとフレームレート
+#define CAPTURE_WIDTH 640
+#define CAPTURE_HEIGHT 480
+#define CAPTURE_FPS 30
+
+// テクスチャ座標の変換係数
+#define TEXTURE_WIDTH 1024
+#define TEXTURE_HEIGHT 512
+static GLuint texname;
+static GLfloat mapping[] =
 {
-  "reflection0.tga",
-  "reflection1.tga",
-  "reflection2.tga",
-  "reflection3.tga",
-  "reflection4.tga",
-  "reflection5.tga",
-  "reflection6.tga",
-  "reflection7.tga",
-  "reflection8.tga",
-  "reflection9.tga"
+  static_cast<GLfloat>(CAPTURE_HEIGHT) / static_cast<GLfloat>(TEXTURE_WIDTH),
+  -static_cast<GLfloat>(CAPTURE_HEIGHT) / static_cast<GLfloat>(TEXTURE_HEIGHT),
+  static_cast<GLfloat>(CAPTURE_WIDTH - CAPTURE_HEIGHT) * 0.5 / static_cast<GLfloat>(TEXTURE_WIDTH),
+  static_cast<GLfloat>(CAPTURE_HEIGHT) / static_cast<GLfloat>(TEXTURE_HEIGHT)
 };
-static const int texfiles = sizeof texfile / sizeof texfile[0];
-static int texselect = 1;
-static GLuint texname[texfiles];
 
 // フレームバッファオブジェクトのサイズ
 #define FBOWIDTH 1024
@@ -143,48 +159,261 @@ static void GLFWCALL keyboard(int key, int action)
 {
   if (action == GLFW_PRESS)
   {
-    if (key >= '0' && key <= '9')
+    switch (key)
     {
-      texselect = key - '0';
-    }
-    else
-    {
-      switch (key)
-      {
-      case GLFW_KEY_SPACE:
-        if (samples < MAXSAMPLES) ++samples;
-        std::cout << "SAMPLES= " << samples << std::endl;
-        break;
-      case GLFW_KEY_BACKSPACE:
-      case GLFW_KEY_DEL:
-        if (samples > 0) --samples;
-        std::cout << "SAMPLES= " << samples << std::endl;
-        break;
-      case GLFW_KEY_UP:
-        std::cout << "TRANSLUCENCY= " << ++translucency * 0.01f << std::endl;
-        break;
-      case GLFW_KEY_DOWN:
-        std::cout << "TRANSLUCENCY= " << --translucency * 0.01f << std::endl;
-        break;
-      case GLFW_KEY_RIGHT:
-        std::cout << "RADIUS= " << ++radius * 0.01f << std::endl;
-        break;
-      case GLFW_KEY_LEFT:
-        std::cout << "RADIUS= " << --radius * 0.01f << std::endl;
-        break;
-      case 'b':
-      case 'B':
-        benchmark = true;
-        break;
-      case GLFW_KEY_ESC:
-      case 'Q':
-      case 'q':
-        exit(0);
-      default:
-        break;
-      }
+    case GLFW_KEY_SPACE:
+      if (samples < MAXSAMPLES) ++samples;
+      std::cout << "SAMPLES= " << samples << std::endl;
+      break;
+    case GLFW_KEY_BACKSPACE:
+    case GLFW_KEY_DEL:
+      if (samples > 0) --samples;
+      std::cout << "SAMPLES= " << samples << std::endl;
+      break;
+    case GLFW_KEY_UP:
+      std::cout << "TRANSLUCENCY= " << ++translucency * 0.01f << std::endl;
+      break;
+    case GLFW_KEY_DOWN:
+      std::cout << "TRANSLUCENCY= " << --translucency * 0.01f << std::endl;
+      break;
+    case GLFW_KEY_RIGHT:
+      std::cout << "RADIUS= " << ++radius * 0.01f << std::endl;
+      break;
+    case GLFW_KEY_LEFT:
+      std::cout << "RADIUS= " << --radius * 0.01f << std::endl;
+      break;
+    case 'b':
+    case 'B':
+      benchmark = true;
+      break;
+    case GLFW_KEY_ESC:
+    case 'Q':
+    case 'q':
+      exit(0);
+    default:
+      break;
     }
   }
+}
+
+// キャプチャ用スレッド
+class CaptureWorker
+{
+  // キャプチャ
+  CvCapture *capture;
+
+  // テクスチャ
+  GLenum format;
+  GLsizei width, height;
+  GLubyte *texture;
+
+  // 実行状態
+  bool status;
+
+  // スレッドとミューテックス
+#ifdef _WIN32
+  HANDLE thread;
+  HANDLE mutex;
+#else
+  pthread_t thread;
+  pthread_mutex_t mutex;
+#endif
+
+public:
+
+  // コンストラクタ
+  CaptureWorker(int index, int width, int height, int fps)
+  {
+    // カメラを初期化する
+    capture = cvCreateCameraCapture(index);
+    if (capture == 0)
+    {
+      std::cerr << "cannot capture image" << std::endl;
+      exit(1);
+    }
+    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, static_cast<double>(width));
+    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, static_cast<double>(height));
+    cvSetCaptureProperty(capture, CV_CAP_PROP_FPS, static_cast<double>(fps));
+
+    // テクスチャ用のメモリを確保する
+    texture = new GLubyte[width * height * 4];
+
+    // パラメータに初期値を与えておく
+    this->width = width;
+    this->height = height;
+    this->format = GL_BGRA;
+
+    // スレッドとミューテックスを生成する
+#ifdef _WIN32
+    mutex = CreateMutex(NULL, TRUE, NULL);
+    thread = CreateThread(NULL, 0, start, (LPVOID)this, 0, NULL);
+#else
+    pthread_mutex_init(&mutex, 0);
+    pthread_create(&thread, 0, start, this);
+#endif
+
+    // スレッドが実行状態であることを記録する
+    status = true;
+  }
+
+  // デストラクタ
+  ~CaptureWorker()
+  {
+    // スレッドを停止する
+    stop();
+
+#ifdef _WIN32
+    // スレッドの停止を待つ
+    WaitForSingleObject(thread, 0); 
+    CloseHandle(thread);
+
+    // ミューテックスを破棄する
+    CloseHandle(mutex);
+#else
+    // スレッドの停止を待つ
+    pthread_join(thread, 0);
+
+    // ミューテックスを破棄する
+    pthread_mutex_destroy(&mutex);
+#endif
+
+    // image の release
+    cvReleaseCapture(&capture);
+
+    // メモリの解放
+    delete[] texture;
+  }
+
+  // mutex のロック
+  void lock(void)
+  {
+#ifdef _WIN32
+    WaitForSingleObject(mutex, 0); 
+#else
+    pthread_mutex_lock(&mutex);
+#endif
+  }
+
+  // mutex のリリース
+  void unlock(void)
+  {
+#ifdef _WIN32
+    ReleaseMutex(mutex);
+#else
+    pthread_mutex_unlock(&mutex);
+#endif
+  }
+
+  // スレッドの開始
+#ifdef _WIN32
+  static DWORD WINAPI start(LPVOID arg)
+#else
+  static void *start(void *arg)
+#endif
+  {
+    return reinterpret_cast<CaptureWorker *>(arg)->getTexture();
+  }
+
+  // スレッドの停止
+  void stop(void)
+  {
+    lock();
+    status = false;
+    unlock();
+  }
+
+  // スレッドの停止判定
+  bool check(void)
+  {
+    bool ret;
+
+    lock();
+    ret = status;
+    unlock();
+
+    return ret;
+  }
+
+  // テクスチャ作成
+#ifdef _WIN32
+  DWORD WINAPI getTexture(void)
+#else
+  void *getTexture(void)
+#endif
+  {
+    for (;;)
+    {
+      // 終了条件のテスト
+      if (!check()) break;
+
+      if (cvGrabFrame(capture))
+      {
+        // キャプチャ映像から画像を切り出す
+        IplImage *image = cvRetrieveFrame(capture);
+
+        if (image)
+        {
+          // 切り出した画像の種類の判別
+          width = image->width;
+          height = image->height;
+          if (image->nChannels == 3)
+            format = GL_BGR;
+          else if (image->nChannels == 4)
+            format = GL_BGRA;
+          else
+            format = GL_RED;
+
+          // テクスチャメモリへの転送
+          GLsizei size = image->width * image->nChannels;
+          lock();
+          for (int y = 0; y < image->height; ++y)
+            memcpy(texture + size * y, image->imageData + image->widthStep * y, size);
+          unlock();
+        }
+        else
+        {
+          // １フレーム分待つ
+#ifdef _WIN32
+          Sleep(1000 / CAPTURE_FPS);
+#else
+          usleep(1000000 / CAPTURE_FPS);
+#endif
+        }
+      }
+    }
+
+    return 0;
+  }
+
+  // テクスチャ転送
+  void sendTexture(void)
+  {
+    lock();
+    glBindTexture(GL_TEXTURE_2D, texname);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, format, GL_UNSIGNED_BYTE, texture);
+    unlock();
+  }
+};
+static CaptureWorker *worker = 0;
+
+//
+// キャプチャ終了時の処理
+//
+static void endCapture(void)
+{
+  delete worker;
+}
+
+//
+// OpenCV の初期化
+//
+static void cvInit(void)
+{
+  // スレッドを生成する
+  worker = new CaptureWorker(CV_CAP_ANY, CAPTURE_WIDTH, CAPTURE_HEIGHT, CAPTURE_FPS);
+
+  // キャプチャ終了時の処理を予約する
+  atexit(endCapture);
 }
 
 //
@@ -241,16 +470,14 @@ static int init(const char *title)
   // フレームバッファオブジェクトの初期値
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
-  // テクスチャファイルの読み込み
-  glGenTextures(texfiles, texname);
-  for (int i = 0; i < texfiles; ++i)
-  {
-    // テクスチャの結合
-    glBindTexture(GL_TEXTURE_2D, texname[i]);
-
-    // 画像ファイルの読み込み
-    ggLoadImage(texfile[i]);
-  }
+  // テクスチャの準備
+  glGenTextures(1, &texname);
+  glBindTexture(GL_TEXTURE_2D, texname);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, TEXTURE_WIDTH, TEXTURE_HEIGHT, 0, GL_BGR, GL_UNSIGNED_BYTE, 0);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
   return true;
 }
@@ -309,6 +536,9 @@ static GLuint prepareFBO(const GLenum *buf, GLuint bufnum, GLuint *tex)
 //
 int main(int argc, const char * argv[])
 {
+  // OpenCV の初期化
+  cvInit();
+
   // 初期設定
   if (!init("Irradiance Map Screen Space Sub-Surface Scattaring")) return 1;
 
@@ -321,6 +551,7 @@ int main(int argc, const char * argv[])
   GLint radiusLoc = glGetUniformLocation(program, "radius");
   GLint translucencyLoc = glGetUniformLocation(program, "translucency");
   GLint ambientLoc = glGetUniformLocation(program, "ambient");
+  GLint mappingLoc = glGetUniformLocation(program, "mapping");
   GLint unitLoc = glGetUniformLocation(program, "unit");
   GLint pointLoc = glGetUniformLocation(program, "point");
   GLint mpLoc = glGetUniformLocation(program, "mp");
@@ -413,6 +644,9 @@ int main(int argc, const char * argv[])
   // ウィンドウが開いている間くり返し描画する
   while (glfwGetWindowParam(GLFW_OPENED))
   {
+    // テクスチャ作成
+    worker->sendTexture();
+
 #if USE_GLFWGETTIME
     // 現在時刻
     double s0, s1, s2;
@@ -480,7 +714,7 @@ int main(int argc, const char * argv[])
     glDisable(GL_DEPTH_TEST);
 
     // 環境のテクスチャ
-    tex[5] = texname[texselect];
+    tex[5] = texname;
 
     // 遅延レンダリング
     glUseProgram(program);
@@ -488,6 +722,7 @@ int main(int argc, const char * argv[])
     glUniform1f(radiusLoc, radius * 0.01f);
     glUniform1f(translucencyLoc, translucency * 0.01f);
     glUniform4fv(ambientLoc, 1, ambient);
+    glUniform4fv(mappingLoc, 1, mapping);
     glUniform1iv(unitLoc, texnum, unit);
     glUniform4fv(pointLoc, MAXSAMPLES, point[0]);
     glUniformMatrix4fv(mpLoc, 1, GL_FALSE, mp.get());
@@ -539,7 +774,7 @@ int main(int argc, const char * argv[])
     glfwSwapBuffers();
 
     // マウス操作などのイベント待機
-    glfwWaitEvents();
+    //glfwWaitEvents();
 
     // マウスの現在位置を取得する
     int mx, my;
