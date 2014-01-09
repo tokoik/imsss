@@ -32,10 +32,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <vector>
 #include <map>
 
-#if defined(_WIN32)
-#  include <windows.h>
-#endif
-
 #include "gg.h"
 
 #if defined(_WIN32)
@@ -4967,9 +4963,49 @@ bool gg::ggLoadHeight(const char *name, float nz, GLenum internal)
 
   return true;
 }
+/*
+** OBJ ファイルの読み込みに使うデータ型
+**
+**     Vine Linux 6.1 の gcc 4.4.5 だと, ローカルに定義
+**     したクラス・構造体を template で使うとエラーになる.
+*/
+namespace gg
+{
+  struct rgb      // 色
+  {
+    float r, g, b;
+  };
+  struct mat      // マテリアル
+  {
+    rgb amb;      // ambient
+    rgb diff;     // diffuse
+    rgb spec;     // specular
+    float shi;    // shininess
+    float dis;    // dissolve
+  };
+  struct vec      // ベクトル
+  {
+    float x, y, z;
+  };
+  struct idx      // 面データ
+  {
+    GLuint p[3];  // 頂点座標番号
+    GLuint t[3];  // テクスチャ座標番号
+    GLuint n[3];  // 頂点法線番号
+    bool smooth;  // スムーズシェーディングの有無
+  };
+  struct grp      // 面グループ
+  {
+    GLuint b;     // 面グループの開始番号
+    GLuint c;     // 面グループの頂点数
+    const mat *m; // 面グループのマテリアル
+    grp(GLuint begin, GLuint count, const mat &material)
+      : b(begin), c(count), m(&material) {}
+  };
+}
 
 /*
-** 三角形分割された OBJ ファイルを読み込む
+** 三角形分割された OBJ ファイルの読み込み
 */
 bool gg::ggLoadObj(const char *name, GLuint &nv, GLfloat (*&pos)[3], GLfloat (*&norm)[3],
   GLuint &nf, GLuint (*&face)[3], bool normalize)
@@ -4988,7 +5024,10 @@ bool gg::ggLoadObj(const char *name, GLuint &nv, GLfloat (*&pos)[3], GLfloat (*&
   // データの数と座標値の最小値・最大値
   float xmin, xmax, ymin, ymax, zmin, zmax;
   xmax = ymax = zmax = -(xmin = ymin = zmin = FLT_MAX);
-  nv = nf = 0;
+
+  // 頂点位置の一時保存
+  std::vector<vec> _pos;
+  std::vector<idx> _face;
 
   // データを読み込む
   while (std::getline(file, line))
@@ -5000,50 +5039,67 @@ bool gg::ggLoadObj(const char *name, GLuint &nv, GLfloat (*&pos)[3], GLfloat (*&
     if (op == "v")
     {
       // 頂点位置
-      float x, y, z;
+      vec v;
 
       // 頂点位置はスペースで区切られている
-      str >> x >> y >> z;
+      str >> v.x >> v.y >> v.z;
 
       // 位置の最大値と最小値を求める (AABB)
-      if (x < xmin) xmin = x;
-      if (x > xmax) xmax = x;
+      xmin = std::min(xmin, v.x);
+      xmax = std::max(xmax, v.x);
+      ymin = std::min(ymin, v.y);
+      ymax = std::max(ymax, v.y);
+      zmin = std::min(zmin, v.z);
+      zmax = std::max(zmax, v.z);
 
-      if (y < ymin) ymin = y;
-      if (y > ymax) ymax = y;
-
-      if (z < zmin) zmin = z;
-      if (z > zmax) zmax = z;
-
-      // 頂点数のカウント
-      ++nv;
+      // 頂点データを保存する
+      _pos.push_back(v);
     }
     else if (op == "f")
     {
-      // 面数のカウント
-      ++nf;
+      // 面データ
+      idx f;
+
+      // 頂点座標番号を取り出す
+      for (int i = 0; i < 3; ++i)
+      {
+        // 1行をスペースで区切って個々の要素の最初の数値を取り出す
+        std::string s;
+        str >> s;
+        f.p[i] = atoi(s.c_str());
+      }
+
+      // 面データを保存する
+      _face.push_back(f);
     }
   }
 
+  // ファイルの読み込みチェック
+  if (file.bad())
+  {
+    // うまく読み込めなかった
+    std::cerr << "Warning: Can't read OBJ file: " << name << std::endl;
+  }
+  file.close();
+
   // メモリの確保
-  GLfloat (*fnorm)[3] = 0;
-  pos = norm = 0;
-  face = 0;
+  pos = norm = NULL;
+  face = NULL;
+  nv = _pos.size();
+  nf = _face.size();
   try
   {
     pos = new GLfloat[nv][3];
     norm = new GLfloat[nv][3];
     face = new GLuint[nf][3];
-    fnorm = new GLfloat[nf][3];
   }
   catch (std::bad_alloc e)
   {
     delete[] pos;
     delete[] norm;
     delete[] face;
-    pos = norm = 0;
-    face = 0;
-    file.close();
+    pos = norm = NULL;
+    face = NULL;
     return false;
   }
 
@@ -5068,64 +5124,28 @@ bool gg::ggLoadObj(const char *name, GLuint &nv, GLfloat (*&pos)[3], GLfloat (*&
     cx = cy = cz = 0.0f;
   }
 
-  // ファイルの巻き戻し
-  file.clear();
-  file.seekg(0L, std::ios::beg);
-
-  // データの読み込み
-  nv = nf = 0;
-  while (std::getline(file, line))
+  // 図形の大きさと位置の正規化とデータのコピー
+  for (std::vector<vec>::const_iterator it = _pos.begin(); it != _pos.end(); ++it)
   {
-    std::istringstream str(line);
-    std::string op;
-    str >> op;
+    const size_t v = it - _pos.begin();
 
-    if (op == "v")
-    {
-      // 頂点位置
-      float x, y, z;
-
-      // 頂点位置はスペースで区切られている
-      str >> x >> y >> z;
-
-      // 位置と大きさの正規化
-      pos[nv][0] = (x - cx) * scale;
-      pos[nv][1] = (y - cy) * scale;
-      pos[nv][2] = (z - cz) * scale;
-
-      // 頂点数のカウント
-      ++nv;
-    }
-    else if (op == "f")
-    {
-      // 頂点座標番号
-      std::string l, m, n;
-
-      // 頂点座標番号/テクスチャ座標番号/法線番号の組を取り出す
-      str >> l >> m >> n;
-
-      // 頂点座標番号だけ整数化する
-      face[nf][0] = atoi(l.c_str()) - 1;
-      face[nf][1] = atoi(m.c_str()) - 1;
-      face[nf][2] = atoi(n.c_str()) - 1;
-
-      // 面数のカウント
-      ++nf;
-    }
+    pos[v][0] = (it->x - cx) * scale;
+    pos[v][1] = (it->y - cy) * scale;
+    pos[v][2] = (it->z - cz) * scale;
   }
 
-  // ファイルの読み込みチェック
-  if (file.bad())
-  {
-    // うまく読み込めなかった
-    std::cerr << "Warning: Can't read OBJ file: " << name << std::endl;
-  }
-  file.close();
+  // 頂点法線の値を 0 にしておく
+  std::fill(reinterpret_cast<GLfloat *>(&norm[0][0]), reinterpret_cast<GLfloat *>(&norm[nv][0]), 0.0f);
 
-  // 面法線の算出
-  for (GLuint f = 0; f < nf; ++f)
+  // 面の法線の算出とデータのコピー
+  for (std::vector<idx>::const_iterator it = _face.begin(); it != _face.end(); ++it)
   {
-    GLuint v0 = face[f][0], v1 = face[f][1], v2 = face[f][2];
+    const size_t f = it - _face.begin();
+
+    // 頂点座標番号を取り出す
+    GLuint v0 = face[f][0] = it->p[0] - 1;
+    GLuint v1 = face[f][1] = it->p[1] - 1;
+    GLuint v2 = face[f][2] = it->p[2] - 1;
 
     // v1 - v0, v2 - v0 を求める
     GLfloat dx1 = pos[v1][0] - pos[v0][0];
@@ -5136,40 +5156,20 @@ bool gg::ggLoadObj(const char *name, GLuint &nv, GLfloat (*&pos)[3], GLfloat (*&
     GLfloat dz2 = pos[v2][2] - pos[v0][2];
 
     // 外積により面法線を求める
-    fnorm[f][0] = dy1 * dz2 - dz1 * dy2;
-    fnorm[f][1] = dz1 * dx2 - dx1 * dz2;
-    fnorm[f][2] = dx1 * dy2 - dy1 * dx2;
-  }
-
-  // 頂点法線の値を 0 にしておく
-  for (GLuint v = 0; v < nv; ++v)
-  {
-    norm[v][0] = norm[v][1] = norm[v][2] = 0.0f;
-  }
-
-  // 頂点法線の算出
-  for (GLuint f = 0; f < nf; ++f)
-  {
-    // 頂点座標番号
-    GLuint v0 = face[f][0], v1 = face[f][1], v2 = face[f][2];
-
-    // 面法線
-    GLfloat x = fnorm[f][0];
-    GLfloat y = fnorm[f][1];
-    GLfloat z = fnorm[f][2];
+    GLfloat nx = dy1 * dz2 - dz1 * dy2;
+    GLfloat ny = dz1 * dx2 - dx1 * dz2;
+    GLfloat nz = dx1 * dy2 - dy1 * dx2;
 
     // 面法線を頂点法線に積算する
-    norm[v0][0] += x;
-    norm[v0][1] += y;
-    norm[v0][2] += z;
-
-    norm[v1][0] += x;
-    norm[v1][1] += y;
-    norm[v1][2] += z;
-
-    norm[v2][0] += x;
-    norm[v2][1] += y;
-    norm[v2][2] += z;
+    norm[v0][0] += nx;
+    norm[v0][1] += ny;
+    norm[v0][2] += nz;
+    norm[v1][0] += nx;
+    norm[v1][1] += ny;
+    norm[v1][2] += nz;
+    norm[v2][0] += nx;
+    norm[v2][1] += ny;
+    norm[v2][2] += nz;
   }
 
   // 頂点法線の正規化
@@ -5190,49 +5190,6 @@ bool gg::ggLoadObj(const char *name, GLuint &nv, GLfloat (*&pos)[3], GLfloat (*&
   return true;
 }
 
-namespace gg
-{
-  // マテリアル
-  struct rgb { float r, g, b; };
-  struct mat
-  {
-    rgb amb;      // ambient
-    rgb diff;     // diffuse
-    rgb spec;     // specular
-    float shi;    // shininess
-    float dis;    // dissolve
-  };
-
-  // 読み込み用のテンポラリデータの形式
-  struct vec      // ベクトル
-  {
-    float x, y, z;
-  };
-  struct vtx      // 頂点属性
-  {
-    vec pos;      // 頂点位置
-    vec norm;     // 頂点法線
-  };
-  struct fac      // 面データ
-  {
-    GLuint v[3];  // 頂点番号
-    GLuint n[3];  // 法線番号
-    vec norm;     // 面法線
-  };
-  struct grp      // 面グループ
-  {
-    GLuint b;     // 面グループの開始番号
-    GLuint c;     // 面グループの頂点数
-    const mat *m; // 面グループのマテリアル
-    grp(GLuint begin, GLuint count, const mat &material)
-    {
-      b = begin;
-      c = count;
-      m = &material;
-    }
-  };
-}
-
 /*
 ** 三角形分割された OBJ ファイルと MTL ファイルを読み込む
 */
@@ -5242,16 +5199,15 @@ bool gg::ggLoadObj(const char *name, GLuint &ng, GLuint (*&group)[2],
 {
   // 引数に初期値を設定する
   ng = 0;
-  group = 0;
-  amb = diff = spec = 0;
-  shi = 0;
+  group = NULL;
+  amb = diff = spec = NULL;
+  shi = NULL;
   nv = 0;
-  pos = 0;
-  norm = 0;
+  pos = norm = NULL;
 
   // ファイルパスからディレクトリ名を取り出す
   std::string path(name);
-  size_t base = path.find_last_of("/\\");
+  const size_t base = path.find_last_of("/\\");
   std::string dirname = (base == std::string::npos) ? "" : path.substr(base + 1);
 
   // OBJ ファイルの読み込み
@@ -5281,13 +5237,19 @@ bool gg::ggLoadObj(const char *name, GLuint &ng, GLuint (*&group)[2],
   mtl[mtlname].dis = 1.0f;
 
   // 読み込み用の一時記憶領域
-  std::vector<vtx> _pos;
+  std::vector<vec> _pos;
+  std::vector<vec> _tex;
   std::vector<vec> _norm;
-  std::vector<fac> _face;
+  std::vector<idx> _face;
   std::vector<grp> _group;
 
-  // 座標値の最小値・最大値
+  // グループの開始番号
   GLuint groupbegin = 0;
+
+  // スムーズシェーディングのスイッチ
+  bool smooth = false;
+
+  // 座標値の最小値・最大値
   float xmin, xmax, ymin, ymax, zmin, zmax;
   xmax = ymax = zmax = -(xmin = ymin = zmin = FLT_MAX);
 
@@ -5310,67 +5272,99 @@ bool gg::ggLoadObj(const char *name, GLuint &ng, GLuint (*&group)[2],
     if (op == "v")
     {
       // 頂点位置
-      vtx v;
+      vec v;
 
       // 頂点位置はスペースで区切られている
-      str >> v.pos.x >> v.pos.y >> v.pos.z;
+      str >> v.x >> v.y >> v.z;
 
-      // 頂点位置の最小値と最大値を求める
-      if (v.pos.x < xmin) xmin = v.pos.x;
-      if (v.pos.x > xmax) xmax = v.pos.x;
-
-      if (v.pos.y < ymin) ymin = v.pos.y;
-      if (v.pos.y > ymax) ymax = v.pos.y;
-
-      if (v.pos.z < zmin) zmin = v.pos.z;
-      if (v.pos.z > zmax) zmax = v.pos.z;
+      // 頂点位置の最小値と最大値を求める (AABB)
+      xmin = std::min(xmin, v.x);
+      xmax = std::max(xmax, v.x);
+      ymin = std::min(ymin, v.y);
+      ymax = std::max(ymax, v.y);
+      zmin = std::min(zmin, v.z);
+      zmax = std::max(zmax, v.z);
 
       // 頂点位置を記録する
       _pos.push_back(v);
     }
+    else if (op == "vt")
+    {
+      // テクスチャ座標
+      vec t;
+
+      // 頂点位置はスペースで区切られている
+      str >> t.x >> t.y;
+      if (!str.eof())
+        str >> t.z;
+      else
+        t.z = 0.0f;
+
+      // テクスチャ座標を記録する
+      _tex.push_back(t);
+    }
     else if (op == "vn")
     {
       // 頂点法線
-      vec norm;
+      vec n;
 
       // 頂点法線はスペースで区切られている
-      str >> norm.x >> norm.y >> norm.z;
+      str >> n.x >> n.y >> n.z;
 
       // 頂点法線を記録する
-      _norm.push_back(norm);
+      _norm.push_back(n);
     }
     else if (op == "f")
     {
       // 面 (三角形) データ
-      fac f;
+      idx f;
+
+      // スムースシェーディング
+      f.smooth = smooth;
 
       //　三頂点のそれぞれについて
       for (int i = 0; i < 3; ++i)
       {
         // １項目取り出す
-        std::string tmp;
-        str >> tmp;
+        std::string s;
+        str >> s;
 
-        // 項目の最初の要素は頂点座標番号 (0 から始まる)
-        f.v[i] = atoi(tmp.c_str()) - 1;
-        f.n[i] = 0;
+        // 項目の最初の要素は頂点座標番号
+        f.p[i] = atoi(s.c_str());
+        f.t[i] = f.n[i] = 0;
 
         // 残りの項目を取り出す
-        size_t pos = tmp.find('/', 0);
-        if (pos != std::string::npos)
+        size_t l = s.find('/', 0);
+        if (l != std::string::npos)
         {
-          // 二つ目の項目は飛ばす
-          pos = tmp.find('/', pos + 1);
-          if (pos != std::string::npos)
+          // 二つ目の項目の先頭の位置
+          ++l;
+
+          // 二つ目の項目はテクスチャ座標
+          f.t[i] = atoi(s.c_str() + l);
+
+          // 三つ目の項目
+          l = s.find('/', l);
+          if (l != std::string::npos)
           {
-            // 三つ目の項目は法線番号 (0 なら法線の割り当てなし)
-            f.n[i] = atoi(tmp.substr(pos + 1).c_str());
+            // 三つ目の項目の先頭の位置
+            ++l;
+
+            // 三つ目の項目は法線番号
+            f.n[i] = atoi(s.c_str() + l);
           }
         }
       }
 
       // 面データの記録ｊ
       _face.push_back(f);
+    }
+    else if (op == "s")
+    {
+      // '1' だったらスムースシェーディング有効
+      std::string s;
+      str >> s;
+      smooth = s == "1";
     }
     else if (op == "usemtl")
     {
@@ -5490,7 +5484,7 @@ bool gg::ggLoadObj(const char *name, GLuint &ng, GLuint (*&group)[2],
   file.close();
 
   // 必要な面数，頂点数，グループ数
-  GLuint nf = static_cast<GLuint>(_face.size());
+  const GLuint nf = static_cast<GLuint>(_face.size());
   nv = nf * 3;
   ng = static_cast<GLuint>(_group.size());
 
@@ -5515,12 +5509,11 @@ bool gg::ggLoadObj(const char *name, GLuint &ng, GLuint (*&group)[2],
     delete[] pos;
 
     ng = 0;
-    group = 0;
-    amb = diff = spec = 0;
-    shi = 0;
+    group = NULL;
+    amb = diff = spec = NULL;
+    shi = NULL;
     nv = 0;
-    pos = 0;
-    norm = 0;
+    pos = norm = NULL;
 
     return false;
   }
@@ -5546,156 +5539,182 @@ bool gg::ggLoadObj(const char *name, GLuint &ng, GLuint (*&group)[2],
     cx = cy = cz = 0.0f;
   }
 
-  // 面法線の算出
-  for (std::vector<fac>::iterator f = _face.begin(); f != _face.end(); ++f)
+  // 法線データがなければ算出しておく
+  if (_norm.empty())
   {
-    // 頂点座標番号
-    GLuint v0 = f->v[0], v1 = f->v[1], v2 = f->v[2];
+    // 法線データ数の初期値は頂点数と同じでスムーズシェーディングのために初期値は 0
+    static const vec zero = { 0.0f, 0.0f, 0.0f };
+    _norm.resize(_pos.size(), zero);
 
-    // v1 - v0, v2 - v0 を求める
-    GLfloat dx1 = _pos[v1].pos.x - _pos[v0].pos.x;
-    GLfloat dy1 = _pos[v1].pos.y - _pos[v0].pos.y;
-    GLfloat dz1 = _pos[v1].pos.z - _pos[v0].pos.z;
-    GLfloat dx2 = _pos[v2].pos.x - _pos[v0].pos.x;
-    GLfloat dy2 = _pos[v2].pos.y - _pos[v0].pos.y;
-    GLfloat dz2 = _pos[v2].pos.z - _pos[v0].pos.z;
-
-    // 外積により面法線を求める
-    f->norm.x = dy1 * dz2 - dz1 * dy2;
-    f->norm.y = dz1 * dx2 - dx1 * dz2;
-    f->norm.z = dx1 * dy2 - dy1 * dx2;
-  }
-
-  // 頂点法線の値を 0 にしておく
-  for (std::vector<vtx>::iterator v = _pos.begin(); v != _pos.end(); ++v)
-  {
-    v->norm.x = v->norm.y = v->norm.z = 0.0f;
-  }
-
-  // 頂点法線の算出
-  for (std::vector<fac>::iterator f = _face.begin(); f != _face.end(); ++f)
-  {
-    // 頂点座標番号
-    GLuint v0 = f->v[0], v1 = f->v[1], v2 = f->v[2];
-
-    // 面法線
-    GLfloat x = f->norm.x;
-    GLfloat y = f->norm.y;
-    GLfloat z = f->norm.z;
-
-    // 面法線を頂点法線に積算する
-    _pos[v0].norm.x += x;
-    _pos[v0].norm.y += y;
-    _pos[v0].norm.z += z;
-
-    _pos[v1].norm.x += x;
-    _pos[v1].norm.y += y;
-    _pos[v1].norm.z += z;
-
-    _pos[v2].norm.x += x;
-    _pos[v2].norm.y += y;
-    _pos[v2].norm.z += z;
-  }
-
-  // 頂点法線の正規化
-  for (std::vector<vtx>::iterator v = _pos.begin(); v != _pos.end(); ++v)
-  {
-    // 頂点法線の長さ
-    GLfloat a = sqrt(v->norm.x * v->norm.x + v->norm.y * v->norm.y + v->norm.z * v->norm.z);
-
-    // 頂点法線を正規化する
-    if (a != 0.0)
+    // 面の法線の算出と頂点法線の算出
+    for (std::vector<idx>::iterator it = _face.begin(); it != _face.end(); ++it)
     {
-      v->norm.x /= a;
-      v->norm.y /= a;
-      v->norm.z /= a;
+      // 頂点座標番号
+      GLuint v0 = it->p[0] - 1;
+      GLuint v1 = it->p[1] - 1;
+      GLuint v2 = it->p[2] - 1;
+
+      // v1 - v0, v2 - v0 を求める
+      GLfloat dx1 = _pos[v1].x - _pos[v0].x;
+      GLfloat dy1 = _pos[v1].y - _pos[v0].y;
+      GLfloat dz1 = _pos[v1].z - _pos[v0].z;
+      GLfloat dx2 = _pos[v2].x - _pos[v0].x;
+      GLfloat dy2 = _pos[v2].y - _pos[v0].y;
+      GLfloat dz2 = _pos[v2].z - _pos[v0].z;
+
+      // 外積により面法線を求める
+      GLfloat nx = dy1 * dz2 - dz1 * dy2;
+      GLfloat ny = dz1 * dx2 - dx1 * dz2;
+      GLfloat nz = dx1 * dy2 - dy1 * dx2;
+
+      if (it->smooth)
+      {
+        // 面法線を頂点法線に積算する
+        _norm[v0].x += nx;
+        _norm[v0].y += ny;
+        _norm[v0].z += nz;
+        _norm[v1].x += nx;
+        _norm[v1].y += ny;
+        _norm[v1].z += nz;
+        _norm[v2].x += nx;
+        _norm[v2].y += ny;
+        _norm[v2].z += nz;
+
+        // 面データを更新する
+        it->n[0] = it->p[0];
+        it->n[1] = it->p[1];
+        it->n[2] = it->p[2];
+      }
+      else
+      {
+        // 面法線を正規化する
+        GLfloat a = sqrt(nx * nx + ny * ny + nz * nz);
+        if (a != 0.0f)
+        {
+          nx /= a;
+          ny /= a;
+          nz /= a;
+        }
+
+        // 3 頂点追加
+        const size_t v = _norm.size();
+        _norm.resize(v + 3);
+
+        // 正規化した面法線をそのまま頂点法線にする
+        _norm[v + 0].x = nx;
+        _norm[v + 0].y = ny;
+        _norm[v + 0].z = nz;
+        _norm[v + 1].x = nx;
+        _norm[v + 1].y = ny;
+        _norm[v + 1].z = nz;
+        _norm[v + 2].x = nx;
+        _norm[v + 2].y = ny;
+        _norm[v + 2].z = nz;
+
+        // 面データを更新する
+        it->n[0] = v + 1;
+        it->n[1] = v + 2;
+        it->n[2] = v + 3;
+      }
     }
   }
 
   // 面ごとの頂点データの作成
-  nv = 0;
-  for (std::vector<fac>::iterator f = _face.begin(); f != _face.end(); ++f)
+  for (std::vector<idx>::const_iterator it = _face.begin(); it != _face.end(); ++it)
   {
-    // 面法線
-    GLfloat x = f->norm.x, y = f->norm.y, z = f->norm.z;
-
-    // 面法線の長さ
-    GLfloat a = sqrt(x * x + y * y + z * z);
-
-    // 面法線の正規化
-    if (a != 0.0)
-    {
-      x /= a;
-      y /= a;
-      z /= a;
-    }
+    const size_t f = (it - _face.begin()) * 3;
 
     // 三頂点のそれぞれについて
     for (int i = 0; i < 3; ++i)
     {
-      // 頂点座標番号と頂点法線番号
-      GLuint fv = f->v[i], fn = f->n[i];
+      const unsigned int v = f + i;
 
-      // 頂点座標を正規化して登録
-      pos[nv][0] = (_pos[fv].pos.x - cx) * scale;
-      pos[nv][1] = (_pos[fv].pos.y - cy) * scale;
-      pos[nv][2] = (_pos[fv].pos.z - cz) * scale;
+      // 頂点座標番号
+      GLuint p = it->p[i];
+      if (p > 0)
+      {
+        --p;
 
-      // 法線番号が 0 なら
-      if (fn == 0)
-      {
-        // 頂点法線を保存する
-        norm[nv][0] = _pos[fv].norm.x;
-        norm[nv][1] = _pos[fv].norm.y;
-        norm[nv][2] = _pos[fv].norm.z;
-      }
-      else
-      {
-        // 読み込まれた頂点法線を使う
-        --fn;
-        norm[nv][0] = _norm[fn].x;
-        norm[nv][1] = _norm[fn].y;
-        norm[nv][2] = _norm[fn].z;
+        // 頂点座標を正規化して登録する
+        pos[v][0] = (_pos[p].x - cx) * scale;
+        pos[v][1] = (_pos[p].y - cy) * scale;
+        pos[v][2] = (_pos[p].z - cz) * scale;
       }
 
-      // 頂点数のカウント
-      ++nv;
+#if 0
+      // テクスチャ座標番号
+      GLuint t = it->t[i];
+      if (t > 0)
+      {
+        --t;
+
+        // テクスチャ座標を登録する
+        tex[v][0] = _tex[t].x;
+        tex[v][1] = _tex[t].y;
+        tex[v][2] = _tex[t].z;
+      }
+#endif
+
+      // 頂点法線番号
+      GLuint n = it->n[i];
+      if (n > 0)
+      {
+        --n;
+
+        GLfloat nx = _norm[n].x;
+        GLfloat ny = _norm[n].y;
+        GLfloat nz = _norm[n].z;
+
+        if (it->smooth)
+        {
+          GLfloat a = sqrt(nx * nx + ny * ny + nz * nz);
+          if (a != 0.0f)
+          {
+            nx /= a;
+            ny /= a;
+            nz /= a;
+          }
+        }
+
+        // 頂点法線を登録する
+        norm[v][0] = nx;
+        norm[v][1] = ny;
+        norm[v][2] = nz;
+      }
     }
   }
 
   // 面グループデータの作成
-  ng = 0;
-  for (std::vector<grp>::iterator g = _group.begin(); g != _group.end(); ++g)
+  for (std::vector<grp>::const_iterator it = _group.begin(); it != _group.end(); ++it)
   {
+    const size_t g = it - _group.begin();
+
     // 面グループの最初の頂点位置番号
-    group[ng][0] = g->b;
+    group[g][0] = it->b;
 
     // 面グループの頂点データの数
-    group[ng][1] = g->c;
+    group[g][1] = it->c;
 
     // 面グループの環境光に対する反射係数
-    amb[ng][0] = g->m->amb.r;
-    amb[ng][1] = g->m->amb.g;
-    amb[ng][2] = g->m->amb.b;
-    amb[ng][3] = 1.0f;
+    amb[g][0] = it->m->amb.r;
+    amb[g][1] = it->m->amb.g;
+    amb[g][2] = it->m->amb.b;
+    amb[g][3] = 1.0f;
 
     // 面グループの拡散反射係数
-    diff[ng][0] = g->m->diff.r;
-    diff[ng][1] = g->m->diff.g;
-    diff[ng][2] = g->m->diff.b;
-    diff[ng][3] = g->m->dis;
+    diff[g][0] = it->m->diff.r;
+    diff[g][1] = it->m->diff.g;
+    diff[g][2] = it->m->diff.b;
+    diff[g][3] = it->m->dis;
 
     // 面グループの鏡面反射係数
-    spec[ng][0] = g->m->spec.r;
-    spec[ng][1] = g->m->spec.g;
-    spec[ng][2] = g->m->spec.b;
-    spec[ng][3] = 1.0f;
+    spec[g][0] = it->m->spec.r;
+    spec[g][1] = it->m->spec.g;
+    spec[g][2] = it->m->spec.b;
+    spec[g][3] = 1.0f;
 
     // 面グループの輝き係数
-    shi[ng] = g->m->shi;
-
-    // 面グループの数
-    ++ng;
+    shi[g] = it->m->shi;
   }
 
   return true;
